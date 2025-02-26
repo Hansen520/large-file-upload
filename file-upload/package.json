@@ -8,6 +8,9 @@
     "qs": "^6.9.6",
     "spark-md5": "^3.0.1"
   },
+  "scripts": {
+    "start": "nodemon js/upload.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
