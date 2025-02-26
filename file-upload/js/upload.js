@@ -37,7 +37,10 @@ const delay = function delay(interval) {
         const buffer = ev.target.result;
         worker.postMessage({ buffer, file });
         worker.onmessage = function (e) {
+        const d = Date.now()
           resolve(e.data);
+          console.log((Date.now() - d) / 1000)
+          worker.terminate(); // 关闭工作线程
         };
       };
     });
@@ -60,7 +63,7 @@ const delay = function delay(interval) {
     upload_progress.style.display = "block";
 
     /* * 获取文件的HASH */
-    const already = []; // 已经上传过的切片的切片名
+    let already = []; // 已经上传过的切片的切片名
     let data = null;
     /* * 得到原始文件的hash和后缀 */
     const { HASH, suffix } = await changeBuffer(file);
@@ -74,13 +77,13 @@ const delay = function delay(interval) {
       });
       if (+data.code === 0) {
         already = data.fileList;
+        
       }
     } catch (err) {}
 
     // 实现文件切片处理 「固定数量 & 固定大小」
-    let CHUNK_SIZE = 1024 * 1024 * 5; // 切片大小先设置5MB
+    let CHUNK_SIZE = 1024 * 1024 * 100; // 切片大小先设置5MB
     let chunkCount = Math.ceil(file.size / CHUNK_SIZE); // 得到应该上传的切片数量
-    const THREAD_COUNT = navigator.hardwareConcurrency || 4; // 线程数量
 
     let index = 0; // 存放切片数组的时候遍历使用
     let chunks = []; // 用以存放切片值
@@ -97,8 +100,6 @@ const delay = function delay(interval) {
       });
       index++;
     }
-
-    console.log(chunks, 105);
 
     index = 0;
 
@@ -133,28 +134,31 @@ const delay = function delay(interval) {
             },
           }
         );
-        console.log(data, 136);
         if (+data.code === 0) {
           alert(`恭喜您，文件上传成功，您可以基于 ${data.servicePath} 访问该文件~~`);
           clear();
           return;
         }
+        
         throw data.codeText;
       } catch (err) {
-        alert("切片合并失败，请您稍后再试~~");
+        // alert("切片合并失败，请您稍后再试~~");
         clear();
       }
     };
-
+ 
     // 循环上传每一个切片
-    chunks.forEach((chunk) => {
+    chunks.forEach((chunk, index) => {
       // 已经上传的无需在上传
-      //后台返回的already格式为['HASH_1.png','HASH_2.png'],既已经上传的文件的切片名
+      // 后台返回的already格式为['HASH_1.png','HASH_2.png'],既已经上传的文件的切片名
+      // 这个是所有的切片都没有漏，都已经上传完毕了的情况
       if (already.length > 0 && already.includes(chunk.filename)) {
-        //已经上传过了的切片就无需再调用接口上传了
+      
+        //已经上传过了的切片就无需再调用接口上传了, 这边其实直接用了断点续传的功能了
         complete(); //动进度条或合并所有切片
         return;
       }
+      // 如果没有上传过，就调用接口上传
       let fm = new FormData();
       fm.append("file", chunk.file);
       fm.append("filename", chunk.filename);
@@ -169,7 +173,7 @@ const delay = function delay(interval) {
           return Promise.reject(data.codeText);
         })
         .catch(() => {
-          alert("当前切片上传失败，请您稍后再试~~");
+        //   alert("当前切片上传失败，请您稍后再试~~");
           clear();
         });
     });
